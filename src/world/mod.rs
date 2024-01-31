@@ -33,22 +33,22 @@ impl World {
     /// * `width` - The width of the world.
     /// * `height` - The height of the world.
     /// * `available_window_size` - The current window size available
-    /// 
+    ///
     /// # Examples
     ///
     /// ```
     /// let world = World::new(10, 10, ui.available_size());
     /// ```
     pub fn new(width: usize, height: usize, available_window_size: Vec2, central_panel_position: Pos2) -> Self {
-        let rects = World::create_rects(available_window_size, width, height, central_panel_position);
+        // let rects = World::create_rects(available_window_size, width, height, central_panel_position);
         let mut materials = Vec::with_capacity(width);
         let cell_size = World::get_cell_size(available_window_size, width, height);
-    
+
         for index_x in 0..width {
             let mut material_row = Vec::with_capacity(height);
             for index_y in 0..height {
-                let cell = rects[index_x][index_y];
-                material_row.push(Material::air(cell));
+                // let cell = rects[index_x][index_y];
+                material_row.push(Material::air());
             }
             materials.push(material_row);
         }
@@ -56,10 +56,10 @@ impl World {
             data: materials,
             width: width,
             height: height,
-            cell_size: cell_size, 
+            cell_size: cell_size,
         }
     }
-    
+
     /// Resizes the world to new dimensions.
     ///
     /// Note that this method creates a new world and does not preserve
@@ -74,12 +74,12 @@ impl World {
 
     pub fn create_rects(available_window_size: Vec2, width: usize, height: usize, central_panel_position: Pos2) -> Vec<Vec<Rect>> {
         let cell_size = World::get_cell_size(available_window_size, width, height);
-        
+
         // Calculate the offset to center the grid
         let offset = World::get_offset(available_window_size, width, height) + central_panel_position.to_vec2();
-        
+
         let mut output = Vec::with_capacity(width);
-    
+
         for index_x in 0..width {
             let mut row = Vec::with_capacity(height);
             for index_y in 0..height {
@@ -99,14 +99,14 @@ impl World {
         if let Some(mouse_position) = pos {
             let window_size = size_of_the_window;
             let offset = World::get_offset(window_size, self.width, self.height) + central_panel_position.to_vec2();
-            
+
             // println!("window_size.x: {} window_size.y: {} offset.x: {} offset.y: {} cell_size: {}", window_size.x, window_size.y, offset.x, offset.y, cell_size);
 
             for index_x in 0..self.width {
                 for index_y in 0..self.height {
                     let x = offset.x + index_x as f32 * self.cell_size;
                     let y = offset.y + index_y as f32 * self.cell_size;
-                    
+
                     // Check if the mouse position is within the cell bounds
                     if mouse_position.x >= x && mouse_position.x < x + self.cell_size &&
                        mouse_position.y >= y && mouse_position.y < y + self.cell_size {
@@ -120,13 +120,13 @@ impl World {
             }
         }
     }
-    
+
 
     fn get_cell_size(available_window_size: Vec2, width: usize, height: usize) -> f32 {
         let cell_width_size = available_window_size.x as f32 / width as f32;
         let cell_height_size = available_window_size.y as f32 / height as f32;
-        
-        // Set the cell size based on the current space available 
+
+        // Set the cell size based on the current space available
         cell_width_size.min(cell_height_size)
     }
 
@@ -135,7 +135,7 @@ impl World {
 
     fn get_offset(available_window_size: Vec2, width: usize, height: usize) -> Vec2 {
         let cellsize = World::get_cell_size(available_window_size, width, height);
-        
+
         let total_grid_size = Vec2 {
             x: width as f32 * cellsize,
             y: height as f32 * cellsize,
@@ -174,7 +174,7 @@ impl Display for World {
 
                 let stroke = egui::Stroke::new(2.0, egui::Color32::WHITE);
                 ui.painter().rect(rect, 0.0, color, stroke);
-                
+
             }
         }
     }
@@ -244,7 +244,7 @@ impl Material {
     pub fn sand(rect: Rect) -> Option<Material>  {
         Some(Material::new(Color32::YELLOW, true, rect))
     }
-    pub fn air(_rect: Rect) -> Option<Material>  {
+    pub fn air() -> Option<Material>  {
         None
     }
 }
