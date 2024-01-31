@@ -40,6 +40,10 @@ impl PhysicsEngine {
                     continue;
                 }
 
+                // Material::sand(Rect::from_min_size(
+                //     Pos2 { x: current.rect.left_top().x - self.cell_size, y: current.rect.left_top().y + self.cell_size },
+                //     egui::Vec2::splat(self.cell_size),
+                // ));
 
                 // Check the cell directly below
                 if y < world.height - 1 && world.data[x][y + 1].is_none() {
