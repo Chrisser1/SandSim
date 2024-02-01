@@ -1,4 +1,4 @@
-use egui::Vec2; // Assuming Vec2 is from egui, import it
+use egui::{Pos2, Vec2}; // Assuming Vec2 is from egui, import it
 
 /// Function for calculating cell size based on window size and world dimensions
 pub fn get_cell_size(available_window_size: Vec2, width: usize, height: usize) -> f32 {
@@ -24,4 +24,14 @@ pub fn get_offset(available_window_size: Vec2, width: usize, height: usize) -> V
     let hardcored_margin = 8.0;
     // Center the grid with a margin
     Vec2{ x: (offset_x + hardcored_margin), y: (offset_y - hardcored_margin)}
+}
+
+pub fn rect_point_collision(mouse_position: Pos2, cell_position: Pos2, cell_size: f32) -> bool {
+    mouse_position.x >= cell_position.x && mouse_position.x < cell_position.x + cell_size &&
+    mouse_position.y >= cell_position.y && mouse_position.y < cell_position.y + cell_size
+}
+
+/// Checks if the given x and y coordinates are within the specified bounds.
+pub fn is_in_bounds_array(x: i32, y: i32, width: usize, height: usize) -> bool {
+    x < width as i32 && y < height as i32 && x >= 0 && y >= 0
 }

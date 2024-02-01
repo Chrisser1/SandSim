@@ -3,7 +3,7 @@ use world::World;
 use self::world::material::{Material, MaterialTypes};
 
 #[path = "./world/display.rs"] mod display;
-use display::{WorldDisplay, clicked};
+use display::{WorldDisplay};
 
 #[path = "./world/physics.rs"] mod physics;
 use physics::{PhysicsEngine};
@@ -16,12 +16,14 @@ pub struct MyApp {
     world: World,
     physics: PhysicsEngine,
     previous_size: Option<Vec2>,
+    display: WorldDisplay,
 }
 
 impl Default for MyApp {
     fn default() -> Self {
         Self {
             world: World::default(),
+            display: WorldDisplay::new(),
             physics: PhysicsEngine::default(),
             previous_size: None,
         }
@@ -82,7 +84,8 @@ impl eframe::App for MyApp {
             if ui.add(egui::Button::new("Stone")).clicked() {
                 self.world.selected_material = MaterialTypes::Stone;
             }
-            // ui.add(egui::Slider::new(&mut self.data, 0..=255).text("Red"));
+
+            ui.add(egui::Slider::new(&mut self.display.click_radius, 0..=10).text("Build radius"));
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -91,7 +94,7 @@ impl eframe::App for MyApp {
 
             ui.input(|input| {
                 if input.pointer.primary_down() {
-                    clicked(&mut self.world, available_size, input.pointer.interact_pos(), central_panel_position);
+                    self.display.clicked( &mut self.world, available_size, input.pointer.interact_pos(), central_panel_position);
                 }
             });
 
@@ -101,11 +104,10 @@ impl eframe::App for MyApp {
                 self.previous_size = Some(available_size);
             }
 
-            WorldDisplay::render(ui, &self.world);
-            self.physics.update_world(&mut self.world);
-            // if self.world.update() {
-            //     ctx.request_repaint();
-            // }
+            self.display.render(ui, &self.world);
+            if self.physics.update_world(&mut self.world) {
+                ctx.request_repaint();
+            }
         });
     }
 }
