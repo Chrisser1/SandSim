@@ -6,6 +6,7 @@ mod render;
 mod utils;
 mod vertex;
 mod matter;
+mod timer;
 
 use bevy::{
     input::mouse::MouseWheel,
@@ -14,6 +15,7 @@ use bevy::{
     time::FixedTimestep,
 };
 use bevy_vulkano::{BevyVulkanoWindows, VulkanoWinitConfig, VulkanoWinitPlugin};
+use timer::{PerformanceTimer, SimTimer, RenderTimer};
 
 use crate::{
     ca_simulator::CASimulator,
@@ -117,11 +119,21 @@ fn setup(mut commands: Commands, vulkano_windows: NonSend<BevyVulkanoWindows>) {
     commands.insert_resource(PreviousMousePos(None));
     commands.insert_resource(CurrentMousePos(None));
     commands.insert_resource(DynamicSettings::default());
+
+    // Simulation performance timer
+    let perf_timer = PerformanceTimer::new();
+    let render_timer = PerformanceTimer::new();
+    commands.insert_resource(SimTimer(perf_timer));
+    commands.insert_resource(RenderTimer(render_timer));
 }
 
 /// Step simulation
-fn simulate(mut sim_pipeline: ResMut<CASimulator>, settings: Res<DynamicSettings>) {
+fn simulate(mut sim_pipeline: ResMut<CASimulator>,
+            settings: Res<DynamicSettings>,
+            mut sim_timer: ResMut<SimTimer>,) {
+    sim_timer.0.start();
     sim_pipeline.step(1, settings.is_paused);
+    sim_timer.0.end();
 }
 
 /// Render the simulation
@@ -130,7 +142,9 @@ fn render(
     mut fill_screen: ResMut<FillScreenRenderPass>,
     camera: Res<OrthographicCamera>,
     simulator: Res<CASimulator>,
+    mut render_timer: ResMut<RenderTimer>,
 ) {
+    render_timer.0.start();
     let (window_renderer, gui) = vulkano_windows.get_primary_window_renderer_mut().unwrap();
     // Start frame
     let before = match window_renderer.acquire() {
@@ -158,6 +172,7 @@ fn render(
     let after_gui = gui.draw_on_image(after_images, final_image);
     // Finish Frame
     window_renderer.present(after_gui, true);
+    render_timer.0.time_it();
 }
 
 /// Update camera (if window is resized)
