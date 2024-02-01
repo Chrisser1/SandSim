@@ -6,7 +6,25 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-egui = "0.25.0"
-eframe = "0.25.0"
+# For using Vulkano with Bevy
+bevy_vulkano = { version = "0.6.0", features = ["gui"] }
+# For implementing our custom Vertex types with Vulkano
+bytemuck = "1.9.1"
+# For creating our graphics / compute pipelines and rendering
+vulkano = "0.30.0"
+# For compiling shaders to be used with Vulkano
+vulkano-shaders = "0.30.0"
+# Vulkano Utilities
+vulkano-util = "0.30.0"
+
+line_drawing = "1.0.0"
+strum_macros = "0.24.0"
+strum = "0.24.0"
+
 rand = "0.8.5"
-const-random = "0.1.17"
+
+# Bevy Game framework without default features, because we're replacing the gfx backend with Vulkano
+[dependencies.bevy]
+version = "0.8.0"
+default-features = false
+features = []
