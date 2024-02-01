@@ -74,15 +74,25 @@ impl eframe::App for MyApp {
                 }
             }
             let count_label = format!("Sand count: {}", count);
+            let count_label = format!("Selected Material: {}", count);
             ui.label(count_label);
             if ui.add(egui::Button::new("Sand")).clicked() {
                 self.world.selected_material = MaterialTypes::Sand;
+            }
+            if ui.add(egui::Button::new("Red Sand")).clicked() {
+                self.world.selected_material = MaterialTypes::RedSand;
+            }
+            if ui.add(egui::Button::new("Rainbow Sand")).clicked() {
+                self.world.selected_material = MaterialTypes::RainbowSand;
             }
             if ui.add(egui::Button::new("Air")).clicked() {
                 self.world.selected_material = MaterialTypes::Air;
             }
             if ui.add(egui::Button::new("Stone")).clicked() {
                 self.world.selected_material = MaterialTypes::Stone;
+            }
+            if ui.add(egui::Button::new("Black Hole")).clicked() {
+                self.world.selected_material = MaterialTypes::BlackHole;
             }
 
             ui.add(egui::Slider::new(&mut self.display.click_radius, 0..=10).text("Build radius"));

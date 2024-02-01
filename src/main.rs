@@ -10,7 +10,6 @@ fn main() -> Result<(), eframe::Error> {
         "Team Lukas app",
         options,
         Box::new(|_cc| {
-
             Box::<MyApp>::default()
         }),
     )

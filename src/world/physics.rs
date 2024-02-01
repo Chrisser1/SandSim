@@ -39,20 +39,23 @@ impl PhysicsEngine {
                 if world.data[x][y].is_none() || world.data[x][y].unwrap().is_static {
                     continue;
                 }
-    
+
                 // Check directly below, down-left, and down-right cells
                 let below = y + 1;
                 let down_left = if x > 0 { Some((x - 1, below)) } else { None };
                 let down_right = if x < world.width - 1 { Some((x + 1, below)) } else { None };
-    
+
                 // Check the cell directly below
                 if world.data[x][below].is_none() {
                     // Move sand particle down
                     something_changed = world.move_material(x, y, x, below);
+                } else if world.data[x][below].unwrap().material_type == MaterialTypes::BlackHole {
+                    world.data[x][y] = None;
+                    something_changed = true;
                 } else {
                     // Randomly choose to check left or right first for more natural behavior
                     let move_left_first = rand::thread_rng().gen_range(0..2) == 0;
-    
+
                     if move_left_first && down_left.map_or(false, |(dx, dy)| world.data[dx][dy].is_none()) {
                         // Move sand particle down-left if possible
                         something_changed = world.move_material(x, y, x - 1, below);
