@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use bevy::math::{IVec2, Vec2};
 use vulkano::{
-    buffer::{BufferUsage, CpuAccessibleBuffer},
+    buffer::{BufferUsage, CpuAccessibleBuffer, DeviceLocalBuffer},
     command_buffer::{
         AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer,
         PrimaryCommandBuffer,
@@ -13,6 +13,7 @@ use vulkano::{
     image::{ImageUsage, StorageImage},
     pipeline::{ComputePipeline, Pipeline, PipelineBindPoint},
     sync::GpuFuture,
+    DeviceSize,
 };
 use vulkano_util::renderer::DeviceImageView;
 
@@ -22,17 +23,16 @@ use crate::{
     CANVAS_SIZE_X, CANVAS_SIZE_Y, LOCAL_SIZE_X, LOCAL_SIZE_Y, NUM_WORK_GROUPS_X, NUM_WORK_GROUPS_Y,
 };
 
-/// Creates a grid with empty matter values
-fn empty_grid(
+fn device_grid(
     compute_queue: &Arc<Queue>,
     width: u32,
     height: u32,
-) -> Arc<CpuAccessibleBuffer<[u32]>> {
-    CpuAccessibleBuffer::from_iter(
+) -> Arc<DeviceLocalBuffer<[u32]>> {
+    DeviceLocalBuffer::array(
         compute_queue.device().clone(),
-        BufferUsage::all(),
-        false,
-        vec![MatterWithColor::new(MatterId::Empty).value; (width * height) as usize],
+        (width * height) as DeviceSize,
+        BufferUsage::storage_buffer() | BufferUsage::transfer_dst(),
+        compute_queue.device().active_queue_families(),
     )
     .unwrap()
 }
@@ -43,12 +43,19 @@ pub struct CASimulator {
     fall_pipeline: Arc<ComputePipeline>,
     slide_pipeline: Arc<ComputePipeline>,
     color_pipeline: Arc<ComputePipeline>,
-    matter_in: Arc<CpuAccessibleBuffer<[u32]>>,
-    matter_out: Arc<CpuAccessibleBuffer<[u32]>>,
+    draw_matter_pipeline: Arc<ComputePipeline>,
+    query_matter_pipeline: Arc<ComputePipeline>,
+    matter_in: Arc<DeviceLocalBuffer<[u32]>>,
+    matter_out: Arc<DeviceLocalBuffer<[u32]>>,
+    query_matter: Arc<CpuAccessibleBuffer<[u32]>>,
     image: DeviceImageView,
     pub sim_step: u32,
     move_step: u32,
-    pub dispatches_per_step: u32,
+    draw_radius: f32,
+    draw_matter: MatterWithColor,
+    draw_pos_start: Vec2,
+    draw_pos_end: Vec2,
+    query_pos: IVec2,
 }
 
 impl CASimulator {
@@ -58,8 +65,15 @@ impl CASimulator {
         // In order to not miss any pixels, the following must be true
         assert_eq!(CANVAS_SIZE_X % LOCAL_SIZE_X, 0);
         assert_eq!(CANVAS_SIZE_Y % LOCAL_SIZE_Y, 0);
-        let matter_in = empty_grid(&compute_queue, CANVAS_SIZE_X, CANVAS_SIZE_Y);
-        let matter_out = empty_grid(&compute_queue, CANVAS_SIZE_X, CANVAS_SIZE_Y);
+        let matter_in = device_grid(&compute_queue, CANVAS_SIZE_X, CANVAS_SIZE_Y);
+        let matter_out = device_grid(&compute_queue, CANVAS_SIZE_X, CANVAS_SIZE_Y);
+        let query_matter = CpuAccessibleBuffer::from_iter(
+            compute_queue.device().clone(),
+            BufferUsage::storage_buffer() | BufferUsage::transfer_dst(),
+            false,
+            vec![MatterWithColor::from(0).value],
+        )
+        .unwrap();
 
         // Assumes all shaders that are loaded with specialication constants have the same constants
         let spec_const = fall_empty_cs::SpecializationConstants {
@@ -71,10 +85,19 @@ impl CASimulator {
         };
 
         // Create pipelines
-        let (fall_pipeline, slide_pipeline, color_pipeline) = {
+        let (
+            fall_pipeline,
+            slide_pipeline,
+            color_pipeline,
+            draw_matter_pipeline,
+            query_matter_pipeline,
+        ) = {
             let fall_shader = fall_empty_cs::load(compute_queue.device().clone()).unwrap();
             let slide_shader = slide_down_empty_cs::load(compute_queue.device().clone()).unwrap();
             let color_shader = color_cs::load(compute_queue.device().clone()).unwrap();
+            let draw_matter_shader = draw_matter_cs::load(compute_queue.device().clone()).unwrap();
+            let query_matter_shader =
+                query_matter_cs::load(compute_queue.device().clone()).unwrap();
             // This must match the shader & inputs in dispatch
             let descriptor_layout = [
                 (0, storage_buffer_desc()),
@@ -101,6 +124,18 @@ impl CASimulator {
                     descriptor_layout.to_vec(),
                     &spec_const,
                 ),
+                create_compute_pipeline(
+                    compute_queue.clone(),
+                    draw_matter_shader.entry_point("main").unwrap(),
+                    descriptor_layout.to_vec(),
+                    &spec_const,
+                ),
+                create_compute_pipeline(
+                    compute_queue.clone(),
+                    query_matter_shader.entry_point("main").unwrap(),
+                    descriptor_layout.to_vec(),
+                    &spec_const,
+                ),
             )
         };
         // Create color image
@@ -121,12 +156,19 @@ impl CASimulator {
             fall_pipeline,
             slide_pipeline,
             color_pipeline,
+            draw_matter_pipeline,
+            query_matter_pipeline,
             matter_in,
             matter_out,
+            query_matter,
             image,
             sim_step: 0,
             move_step: 0,
-            dispatches_per_step: 0,
+            draw_radius: 0.0,
+            draw_matter: MatterWithColor::from(0),
+            draw_pos_start: Vec2::new(0.0, 0.0),
+            draw_pos_end: Vec2::new(0.0, 0.0),
+            query_pos: IVec2::new(0, 0),
         }
     }
 
@@ -140,62 +182,78 @@ impl CASimulator {
         pos.x >= 0 && pos.x < CANVAS_SIZE_X as i32 && pos.y >= 0 && pos.y < CANVAS_SIZE_Y as i32
     }
 
-    /// Index to access our one dimensional grid with two dimensional position
-    fn index(&self, pos: IVec2) -> usize {
-        (pos.y * CANVAS_SIZE_Y as i32 + pos.x) as usize
+    fn command_buffer_builder(&self) -> AutoCommandBufferBuilder<PrimaryAutoCommandBuffer> {
+        AutoCommandBufferBuilder::primary(
+            self.compute_queue.device().clone(),
+            self.compute_queue.family(),
+            CommandBufferUsage::OneTimeSubmit,
+        )
+        .unwrap()
+    }
+
+    fn execute(
+        &self,
+        command_buffer_builder: AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+        wait: bool,
+    ) {
+        let command_buffer = command_buffer_builder.build().unwrap();
+        let finished = command_buffer.execute(self.compute_queue.clone()).unwrap();
+        let future = finished.then_signal_fence_and_flush().unwrap();
+        if wait {
+            future.wait(None).unwrap();
+        }
     }
 
     /// Query matter at pos
-    pub fn query_matter(&self, pos: IVec2) -> Option<MatterId> {
+    pub fn query_matter(&mut self, pos: IVec2) -> Option<MatterId> {
         if self.is_inside(pos) {
-            let matter_in = self.matter_in.read().unwrap();
-            let index = self.index(pos);
-            Some(MatterWithColor::from(matter_in[index]).matter_id())
+            self.query_pos = pos;
+            // Build command buffer
+            let mut command_buffer_builder = self.command_buffer_builder();
+
+            // Dispatch
+            self.dispatch(
+                &mut command_buffer_builder,
+                self.query_matter_pipeline.clone(),
+                false,
+            );
+
+            // Execute & finish (wait)
+            self.execute(command_buffer_builder, true);
+
+            // Read result
+            let query_matter = self.query_matter.read().unwrap();
+            Some(MatterWithColor::from(query_matter[0]).matter_id())
         } else {
             None
         }
     }
 
     /// Draw matter line with given radius
-    pub fn draw_matter(&mut self, line: &[IVec2], radius: f32, matter: MatterId) {
-        let mut matter_in = self.matter_in.write().unwrap();
-        for &pos in line.iter() {
-            if !self.is_inside(pos) {
-                continue;
-            }
-            let y_start = pos.y - radius as i32;
-            let y_end = pos.y + radius as i32;
-            let x_start = pos.x - radius as i32;
-            let x_end = pos.x + radius as i32;
-            for y in y_start..=y_end {
-                for x in x_start..=x_end {
-                    let world_pos = Vec2::new(x as f32, y as f32);
-                    if world_pos
-                        .distance(Vec2::new(pos.x as f32, pos.y as f32))
-                        .round()
-                        <= radius
-                    {
-                        if self.is_inside([x, y].into()) {
-                            // Draw
-                            matter_in[self.index([x, y].into())] =
-                                MatterWithColor::new(matter).value;
-                        }
-                    }
-                }
-            }
-        }
+    pub fn draw_matter(&mut self, start: Vec2, end: Vec2, radius: f32, matter: MatterId) {
+        // Update our variables to be used as push constants
+        self.draw_pos_start = start;
+        self.draw_pos_end = end;
+        self.draw_matter = MatterWithColor::new(matter);
+        self.draw_radius = radius;
+
+        // Build command buffer
+        let mut command_buffer_builder = self.command_buffer_builder();
+
+        // Dispatch
+        self.dispatch(
+            &mut command_buffer_builder,
+            self.draw_matter_pipeline.clone(),
+            false,
+        );
+
+        // Execute & finish (no need to wait)
+        self.execute(command_buffer_builder, false);
     }
 
     /// Step simulation
     pub fn step(&mut self, move_steps: u32, is_paused: bool) {
-        self.dispatches_per_step = 0;
-
-        let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
-            self.compute_queue.device().clone(),
-            self.compute_queue.family(),
-            CommandBufferUsage::OneTimeSubmit,
-        )
-        .unwrap();
+        let mut command_buffer_builder = self.command_buffer_builder();
 
         if !is_paused {
             for _ in 0..move_steps {
@@ -211,10 +269,8 @@ impl CASimulator {
             false,
         );
 
-        // Finish
-        let command_buffer = command_buffer_builder.build().unwrap();
-        let finished = command_buffer.execute(self.compute_queue.clone()).unwrap();
-        let _fut = finished.then_signal_fence_and_flush().unwrap();
+        // Execute & finish (no need to wait)
+        self.execute(command_buffer_builder, false);
 
         self.sim_step += 1;
     }
@@ -242,12 +298,18 @@ impl CASimulator {
             WriteDescriptorSet::buffer(0, self.matter_in.clone()),
             WriteDescriptorSet::buffer(1, self.matter_out.clone()),
             WriteDescriptorSet::image_view(2, self.image.clone()),
+            WriteDescriptorSet::buffer(3, self.query_matter.clone()),
         ])
         .unwrap();
         // Assumes all shaders that are 'dispatched' have the same push constants
         let push_constants = fall_empty_cs::ty::PushConstants {
             sim_step: self.sim_step as u32,
             move_step: self.move_step as u32,
+            draw_pos_start: self.draw_pos_start.into(),
+            draw_pos_end: self.draw_pos_end.into(),
+            draw_radius: self.draw_radius,
+            draw_matter: self.draw_matter.value,
+            query_pos: self.query_pos.into(),
         };
         builder
             .bind_pipeline_compute(pipeline.clone())
@@ -260,7 +322,6 @@ impl CASimulator {
         if swap {
             std::mem::swap(&mut self.matter_in, &mut self.matter_out);
         }
-        self.dispatches_per_step += 1;
     }
 }
 
@@ -282,6 +343,20 @@ mod color_cs {
     vulkano_shaders::shader! {
         ty: "compute",
         path: "compute_shaders/color.glsl"
+    }
+}
+
+mod draw_matter_cs {
+    vulkano_shaders::shader! {
+        ty: "compute",
+        path: "compute_shaders/draw_matter.glsl"
+    }
+}
+
+mod query_matter_cs {
+    vulkano_shaders::shader! {
+        ty: "compute",
+        path: "compute_shaders/query_matter.glsl"
     }
 }
 
@@ -309,7 +384,7 @@ mod tests {
         let pos = IVec2::new(10, 10);
         // Empty matter first
         assert_eq!(simulator.query_matter(pos), Some(MatterId::Empty));
-        simulator.draw_matter(&[pos], 0.5, MatterId::Sand);
+        simulator.draw_matter(pos.as_vec2(), pos.as_vec2(), 0.5, MatterId::Sand);
         // After drawing, We have Sand
         assert_eq!(simulator.query_matter(pos), Some(MatterId::Sand));
         // Step once

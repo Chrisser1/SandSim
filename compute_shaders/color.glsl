@@ -2,14 +2,6 @@
 
 #include "includes.glsl"
 
-// Changed!
-vec4 matter_color_to_vec4(uint color) {
-    return  vec4(float((color >> uint(16)) & uint(255)) / 255.0,
-                float((color >> uint(8)) & uint(255)) / 255.0,
-                float(color & uint(255)) / 255.0,
-                1.0);
-}
-
 // 0-1 linear  from  0-255 sRGB
 vec3 linear_from_srgb(vec3 srgb) {
     bvec3 cutoff = lessThan(srgb, vec3(10.31475));

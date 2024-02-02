@@ -1,9 +1,8 @@
-use rand::Rng;
 use strum_macros::EnumIter;
 
 use crate::{
-    utils::{u32_rgba_to_u8_rgba, u8_rgba_to_u32_rgba},
-    EMPTY_COLOR,
+    utils::{grey_scale_u32, u32_rgba_to_u8_rgba, u8_rgba_to_u32_rgba},
+    EMPTY_COLOR, GREY_SCALE,
 };
 
 /// Matter Id representing matter that we simulate
@@ -13,6 +12,7 @@ pub enum MatterId {
     Empty = 0,
     Sand = 1,
     Stone = 2,
+    Water = 3,
 }
 
 impl Default for MatterId {
@@ -32,30 +32,14 @@ impl MatterId {
         let color = match *self {
             MatterId::Empty => EMPTY_COLOR,
             MatterId::Sand => 0xc2b280ff,
-            MatterId::Stone => 0x6B6867ff,
+            MatterId::Stone => 0x787a79ff,
+            MatterId::Water => 0x0f5e9cff,
         };
-        u32_rgba_to_u8_rgba(color)
-    }
-
-    fn gen_variate_color_rgba_u8(&self) -> [u8; 4] {
-        let p = rand::thread_rng().gen::<f32>();
-        let color = self.color_rgba_f32();
-        let variation = -0.1 + 0.2 * p;
-        let r = ((color[0] + variation).clamp(0.0, 1.0) * 255.0) as u8;
-        let g = ((color[1] + variation).clamp(0.0, 1.0) * 255.0) as u8;
-        let b = ((color[2] + variation).clamp(0.0, 1.0) * 255.0) as u8;
-        let a = 255;
-        [r, g, b, a]
-    }
-
-    fn color_rgba_f32(&self) -> [f32; 4] {
-        let rgba = self.color_rgba_u8();
-        [
-            rgba[0] as f32 / 255.0,
-            rgba[1] as f32 / 255.0,
-            rgba[2] as f32 / 255.0,
-            rgba[3] as f32 / 255.0,
-        ]
+        if GREY_SCALE {
+            u32_rgba_to_u8_rgba(grey_scale_u32(color))
+        } else {
+            u32_rgba_to_u8_rgba(color)
+        }
     }
 }
 
@@ -68,11 +52,7 @@ pub struct MatterWithColor {
 impl MatterWithColor {
     /// Creates a new matter with color from matter id giving it a slightly randomized color
     pub fn new(matter_id: MatterId) -> MatterWithColor {
-        let color = if matter_id != MatterId::Empty {
-            matter_id.gen_variate_color_rgba_u8()
-        } else {
-            matter_id.color_rgba_u8()
-        };
+        let color = matter_id.color_rgba_u8();
         MatterWithColor {
             value: u8_rgba_to_u32_rgba(color[0], color[1], color[2], matter_id as u8),
         }

@@ -120,6 +120,17 @@ pub fn u8_rgba_to_u32_rgba(r: u8, g: u8, b: u8, a: u8) -> u32 {
     ((r as u32) << 24) | ((g as u32) << 16) | ((b as u32) << 8) | (a as u32 & 255)
 }
 
+/// Converts u32 color to gray scale for a wanted visual effect
+/// https://stackoverflow.com/questions/42516203/converting-rgba-image-to-grayscale-golang
+pub fn grey_scale_u32(color: u32) -> u32 {
+    let color = u32_rgba_to_u8_rgba(color);
+    let r = (0.299 * color[0] as f32) as u8;
+    let g = (0.587 * color[1] as f32) as u8;
+    let b = (0.114 * color[2] as f32) as u8;
+    let y = r + g + b;
+    u8_rgba_to_u32_rgba(y, y, y, 255)
+}
+
 /// Converts cursor position to world coordinates
 pub fn cursor_to_world(window: &Window, camera_pos: Vec2, camera_scale: f32) -> Vec2 {
     (window.cursor_position().unwrap() - Vec2::new(window.width() / 2.0, window.height() / 2.0))
@@ -145,21 +156,4 @@ impl MousePos {
     pub fn canvas_pos(&self) -> Vec2 {
         self.world + Vec2::new(CANVAS_SIZE_X as f32 / 2.0, CANVAS_SIZE_Y as f32 / 2.0)
     }
-}
-
-/// Gets a line of canvas coordinates between previous and current mouse position
-pub fn get_canvas_line(prev: Option<MousePos>, current: MousePos) -> Vec<IVec2> {
-    let canvas_pos = current.canvas_pos();
-    let prev = if let Some(prev) = prev {
-        prev.canvas_pos()
-    } else {
-        canvas_pos
-    };
-    line_drawing::Bresenham::new(
-        (prev.x.round() as i32, prev.y.round() as i32),
-        (canvas_pos.x.round() as i32, canvas_pos.y.round() as i32),
-    )
-    .into_iter()
-    .map(|pos| IVec2::new(pos.0, pos.1))
-    .collect::<Vec<IVec2>>()
 }

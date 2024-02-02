@@ -33,6 +33,14 @@ impl PerformanceTimer {
         }
     }
 
+    #[allow(unused)]
+    pub fn push_dt_ms(&mut self, dt: f64) {
+        self.data.push_back(dt);
+        if self.data.len() >= NUM_TIME_SAMPLES {
+            self.data.pop_front();
+        }
+    }
+
     pub fn time_average_ms(&self) -> f64 {
         self.data.iter().sum::<f64>() / self.data.len() as f64
     }

@@ -12,10 +12,16 @@ Buffers
 layout(set = 0, binding = 0) restrict buffer MatterInBuffer { uint matter_in[]; };
 layout(set = 0, binding = 1) restrict writeonly buffer MatterOutBuffer { uint matter_out[]; };
 layout(set = 0, binding = 2, rgba8) restrict uniform writeonly image2D canvas_img;
+layout(set = 0, binding = 3) restrict writeonly buffer QueryMatterBuffer { uint query_matter[]; };
 
 layout(push_constant) uniform PushConstants {
     uint sim_step;
     uint move_step;
+    vec2 draw_pos_start;
+    vec2 draw_pos_end;
+    float draw_radius;
+    uint draw_matter;
+    ivec2 query_pos;
 } push_constants;
 
 #include "dirs.glsl"
@@ -30,7 +36,7 @@ ivec2 get_current_sim_pos() {
 }
 
 int get_index(ivec2 pos) {
-    return pos.y * canvas_size_x + pos.x;
+    return pos.y * canvas_size_y + pos.x;
 }
 
 bool is_at_border_top(ivec2 pos) {
@@ -62,8 +68,16 @@ uint matter_to_uint(Matter matter) {
     return ((matter.color << uint(8)) | matter.matter);
 }
 
+void write_query_matter(Matter matter) {
+    query_matter[0] = matter_to_uint(matter);
+}
+
 void write_matter(ivec2 pos, Matter matter) {
     matter_out[get_index(pos)] = matter_to_uint(matter);
+}
+
+void write_matter_input(ivec2 pos, Matter matter) {
+    matter_in[get_index(pos)] = matter_to_uint(matter);
 }
 
 void write_image_color(ivec2 pos, vec4 color) {
@@ -90,9 +104,8 @@ bool is_empty(Matter matter) {
     return matter.matter == 0;
 }
 
-// A shortcut for Sand. Wood does not have gravity for now...
 bool is_gravity(Matter m) {
-    return m.matter == 1;
+    return m.matter == 1 || m.matter == 3;
 }
 
 bool falls_on_empty(Matter from, Matter to) {
@@ -102,3 +115,33 @@ bool falls_on_empty(Matter from, Matter to) {
 bool slides_on_empty(Matter from_diagonal, Matter to_diagonal, Matter from_down) {
     return is_gravity(from_diagonal) && !is_empty(from_down) && is_empty(to_diagonal);
 }
+
+// /// From could move to one direction to empty only
+// bool moves_on_empty_certainly(Matter from, Matter to, Matter opposite, Matter down) {
+//     return push_constants.dispersion_step < from.dispersion &&
+//     ((is_liquid(from) && !is_empty(down)) || is_gas(from)) &&
+//     is_empty(to) && !is_empty(opposite);
+// }
+
+// /// From could move to one direction to liquid only
+// bool moves_on_swap_certainly(Matter from, Matter to, Matter opposite) {
+//     return push_constants.dispersion_step < from.dispersion &&
+//     (is_liquid(from) || is_gas(from)) && (is_liquid(to) || is_gas(to) || is_energy(to)) &&
+//     !(is_liquid(opposite) && opposite.weight < from.weight) &&
+//     to.weight < from.weight;
+// }
+
+// /// From could move to both direction to empty, but takes a change at one direction
+// bool moves_on_empty_maybe(Matter from, Matter to, Matter opposite, Matter down, float p) {
+//     return p < 0.5 && push_constants.dispersion_step < from.dispersion &&
+//     ((is_liquid(from) && !is_empty(down)) || is_gas(from)) &&
+//     is_empty(to) && is_empty(opposite);
+// }
+
+vec4 matter_color_to_vec4(uint color) {
+    return  vec4(float((color >> uint(16)) & uint(255)) / 255.0,
+        float((color >> uint(8)) & uint(255)) / 255.0,
+        float(color & uint(255)) / 255.0,
+        1.0);
+}
+

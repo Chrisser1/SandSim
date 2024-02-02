@@ -1,47 +1,51 @@
 mod ca_simulator;
 mod camera;
 mod gui;
+mod matter;
 mod quad_pipeline;
 mod render;
+mod timer;
 mod utils;
 mod vertex;
-mod matter;
-mod timer;
 
 use bevy::{
     input::mouse::MouseWheel,
     prelude::*,
-    window::{close_on_esc, WindowMode},
     time::FixedTimestep,
+    window::{close_on_esc, WindowMode},
 };
-use bevy_vulkano::{BevyVulkanoWindows, VulkanoWinitConfig, VulkanoWinitPlugin};
-use timer::{PerformanceTimer, SimTimer, RenderTimer};
+use bevy_vulkano::{
+    egui_winit_vulkano::egui::Visuals, BevyVulkanoWindows, VulkanoWinitConfig, VulkanoWinitPlugin,
+};
 
 use crate::{
     ca_simulator::CASimulator,
     camera::OrthographicCamera,
     gui::user_interface,
-    render::FillScreenRenderPass,
-    utils::{cursor_to_world, get_canvas_line, MousePos},
     matter::MatterId,
+    render::FillScreenRenderPass,
+    timer::{PerformanceTimer, RenderTimer, SimTimer},
+    utils::{cursor_to_world, MousePos},
 };
 
 pub const WIDTH: f32 = 1920.0;
-pub const HEIGHT: f32 = 1000.0;
-pub const CANVAS_SIZE_X: u32 = 512;
-pub const CANVAS_SIZE_Y: u32 = 512;
+pub const HEIGHT: f32 = 1080.0;
+pub const CANVAS_SIZE_X: u32 = 1024;
+pub const CANVAS_SIZE_Y: u32 = 1024;
 pub const LOCAL_SIZE_X: u32 = 32;
 pub const LOCAL_SIZE_Y: u32 = 32;
 pub const NUM_WORK_GROUPS_X: u32 = CANVAS_SIZE_X / LOCAL_SIZE_X;
 pub const NUM_WORK_GROUPS_Y: u32 = CANVAS_SIZE_Y / LOCAL_SIZE_Y;
 pub const SIM_FPS: f64 = 60.0;
 /// Grey scale theme for cool looks
-pub const CLEAR_COLOR: [f32; 4] = [0.0; 4];
-pub const EMPTY_COLOR: u32 = 0x0;
+pub const GREY_SCALE: bool = false;
+pub const CLEAR_COLOR: [f32; 4] = if GREY_SCALE { [0.8; 4] } else { [0.0; 4] };
+pub const EMPTY_COLOR: u32 = if GREY_SCALE { 0xffffffff } else { 0x0 };
 pub const CAMERA_MOVE_SPEED: f32 = 200.0;
 
 pub struct DynamicSettings {
     pub brush_radius: f32,
+    pub move_steps: u32,
     pub draw_matter: MatterId,
     pub is_paused: bool,
 }
@@ -50,11 +54,18 @@ impl Default for DynamicSettings {
     fn default() -> Self {
         Self {
             brush_radius: 4.0,
+            move_steps: 1,
             draw_matter: MatterId::Sand,
             is_paused: false,
         }
     }
 }
+
+#[derive(Debug, Copy, Clone)]
+pub struct PreviousMousePos(pub Option<MousePos>);
+
+#[derive(Debug, Copy, Clone)]
+pub struct CurrentMousePos(pub Option<MousePos>);
 
 fn main() {
     App::new()
@@ -83,16 +94,15 @@ fn main() {
         .add_system(update_camera)
         .add_system(update_mouse)
         .add_system(draw_matter)
-        // Simulate only SIM_FPS times per second. Instead of add_system(simulate)
+        // Simulate only SIM_FPS times per second
         .add_system_set_to_stage(
             CoreStage::Update,
             SystemSet::new()
                 .with_run_criteria(FixedTimestep::steps_per_second(SIM_FPS))
                 .with_system(simulate),
         )
-        .add_system(simulate)
         // Gui
-        .add_system(user_interface)
+        .add_system(user_interface.after(simulate))
         // Render after update
         .add_system_to_stage(CoreStage::PostUpdate, render)
         .run();
@@ -100,51 +110,89 @@ fn main() {
 
 /// Creates our simulation & render pipelines
 fn setup(mut commands: Commands, vulkano_windows: NonSend<BevyVulkanoWindows>) {
-    let (primary_window_renderer, _gui) = vulkano_windows.get_primary_window_renderer().unwrap();
+    let (primary_window_renderer, gui) = vulkano_windows.get_primary_window_renderer().unwrap();
     // Create our render pass
     let fill_screen = FillScreenRenderPass::new(
         primary_window_renderer.graphics_queue(),
         primary_window_renderer.swapchain_format(),
     );
-    let simulator = CASimulator::new(primary_window_renderer.compute_queue());
 
+    // Use same queue for compute
+    let mut sim_pipeline = CASimulator::new(primary_window_renderer.compute_queue());
+    // Ensure bg is white for empty when grey scale...
+    if GREY_SCALE {
+        let start = Vec2::new(CANVAS_SIZE_X as f32, CANVAS_SIZE_Y as f32) / 2.0;
+        let end = start;
+        sim_pipeline.draw_matter(start, end, CANVAS_SIZE_X as f32, MatterId::Empty);
+    }
     // Create simple orthographic camera
     let mut camera = OrthographicCamera::default();
     // Zoom camera to fit vertical pixels
     camera.zoom_to_fit_vertical_pixels(CANVAS_SIZE_Y, HEIGHT as u32);
-    // Insert resources
-    commands.insert_resource(fill_screen);
-    commands.insert_resource(camera);
-    commands.insert_resource(simulator);
-    commands.insert_resource(PreviousMousePos(None));
-    commands.insert_resource(CurrentMousePos(None));
-    commands.insert_resource(DynamicSettings::default());
-
     // Simulation performance timer
     let perf_timer = PerformanceTimer::new();
     let render_timer = PerformanceTimer::new();
+    // Insert resources
+    commands.insert_resource(fill_screen);
+    commands.insert_resource(sim_pipeline);
+    commands.insert_resource(camera);
+    commands.insert_resource(DynamicSettings::default());
+    commands.insert_resource(PreviousMousePos(None));
+    commands.insert_resource(CurrentMousePos(None));
     commands.insert_resource(SimTimer(perf_timer));
     commands.insert_resource(RenderTimer(render_timer));
+
+    // Set light mode
+    let ctx = gui.context();
+    if GREY_SCALE {
+        ctx.set_visuals(Visuals::light());
+    } else {
+        ctx.set_visuals(Visuals::dark());
+    }
+}
+
+/// Draw matter to our grid
+fn draw_matter(
+    mut simulator: ResMut<CASimulator>,
+    prev: Res<PreviousMousePos>,
+    current: Res<CurrentMousePos>,
+    settings: Res<DynamicSettings>,
+    mouse_button_input: Res<Input<MouseButton>>,
+) {
+    if let Some(current) = current.0 {
+        if mouse_button_input.pressed(MouseButton::Left) {
+            let end = current.canvas_pos();
+            let start = if let Some(prev) = prev.0 {
+                prev.canvas_pos()
+            } else {
+                end
+            };
+            simulator.draw_matter(start, end, settings.brush_radius, settings.draw_matter);
+        }
+    }
 }
 
 /// Step simulation
-fn simulate(mut sim_pipeline: ResMut<CASimulator>,
-            settings: Res<DynamicSettings>,
-            mut sim_timer: ResMut<SimTimer>,) {
+fn simulate(
+    mut sim_pipeline: ResMut<CASimulator>,
+    settings: Res<DynamicSettings>,
+    mut sim_timer: ResMut<SimTimer>,
+) {
     sim_timer.0.start();
-    sim_pipeline.step(1, settings.is_paused);
-    sim_timer.0.end();
+    sim_pipeline.step(settings.move_steps, settings.is_paused);
+    sim_timer.0.time_it();
 }
 
 /// Render the simulation
 fn render(
     mut vulkano_windows: NonSendMut<BevyVulkanoWindows>,
     mut fill_screen: ResMut<FillScreenRenderPass>,
+    sim_pipeline: Res<CASimulator>,
     camera: Res<OrthographicCamera>,
-    simulator: Res<CASimulator>,
     mut render_timer: ResMut<RenderTimer>,
 ) {
     render_timer.0.start();
+
     let (window_renderer, gui) = vulkano_windows.get_primary_window_renderer_mut().unwrap();
     // Start frame
     let before = match window_renderer.acquire() {
@@ -155,7 +203,7 @@ fn render(
         Ok(f) => f,
     };
 
-    let canvas_image = simulator.color_image();
+    let canvas_image = sim_pipeline.color_image();
 
     // Render
     let final_image = window_renderer.swapchain_image_view();
@@ -168,10 +216,13 @@ fn render(
         false,
         true,
     );
+
     // Draw gui
     let after_gui = gui.draw_on_image(after_images, final_image);
+
     // Finish Frame
     window_renderer.present(after_gui, true);
+
     render_timer.0.time_it();
 }
 
@@ -181,12 +232,29 @@ fn update_camera(windows: Res<Windows>, mut camera: ResMut<OrthographicCamera>) 
     camera.update(window.width(), window.height());
 }
 
+/// Update mouse position
+fn update_mouse(
+    windows: Res<Windows>,
+    mut _prev: ResMut<PreviousMousePos>,
+    mut _current: ResMut<CurrentMousePos>,
+    camera: Res<OrthographicCamera>,
+) {
+    _prev.0 = _current.0;
+    let primary = windows.get_primary().unwrap();
+    if primary.cursor_position().is_some() {
+        _current.0 = Some(MousePos {
+            world: cursor_to_world(primary, camera.pos, camera.scale),
+        });
+    }
+}
+
 /// Input actions for camera movement, zoom and pausing
 fn input_actions(
     time: Res<Time>,
     mut camera: ResMut<OrthographicCamera>,
     keyboard_input: Res<Input<KeyCode>>,
     mut mouse_input_events: EventReader<MouseWheel>,
+    mut settings: ResMut<DynamicSettings>,
 ) {
     // Move camera with arrows & WASD
     let up = keyboard_input.pressed(KeyCode::W) || keyboard_input.pressed(KeyCode::Up);
@@ -211,44 +279,9 @@ fn input_actions(
             camera.scale *= 1.0 / 1.05;
         }
     }
-}
 
-/// Draw matter to our grid
-fn draw_matter(
-    mut simulator: ResMut<CASimulator>,
-    prev: Res<PreviousMousePos>,
-    current: Res<CurrentMousePos>,
-    mouse_button_input: Res<Input<MouseButton>>,
-    settings: Res<DynamicSettings>,
-) {
-    if let Some(current) = current.0 {
-        if mouse_button_input.pressed(MouseButton::Left) {
-            let line = get_canvas_line(prev.0, current);
-            simulator.draw_matter(&line, settings.brush_radius, settings.draw_matter);
-        }
-    }
-}
-
-/// Mouse position from last frame
-#[derive(Debug, Copy, Clone)]
-pub struct PreviousMousePos(pub Option<MousePos>);
-
-/// Mouse position now
-#[derive(Debug, Copy, Clone)]
-pub struct CurrentMousePos(pub Option<MousePos>);
-
-/// Update mouse position
-fn update_mouse(
-    windows: Res<Windows>,
-    mut _prev: ResMut<PreviousMousePos>,
-    mut _current: ResMut<CurrentMousePos>,
-    camera: Res<OrthographicCamera>,
-) {
-    _prev.0 = _current.0;
-    let primary = windows.get_primary().unwrap();
-    if primary.cursor_position().is_some() {
-        _current.0 = Some(MousePos {
-            world: cursor_to_world(primary, camera.pos, camera.scale),
-        });
+    // Pause
+    if keyboard_input.just_pressed(KeyCode::Space) {
+        settings.is_paused = !settings.is_paused;
     }
 }

@@ -9,14 +9,12 @@ use bevy_vulkano::{
 use strum::IntoEnumIterator;
 
 use crate::{
-    ca_simulator::CASimulator, 
-    camera::OrthographicCamera, 
-    matter::MatterId, 
-    timer::{SimTimer, RenderTimer}, 
-    utils::{cursor_to_world, MousePos}, 
-    DynamicSettings, 
-    CANVAS_SIZE_X, 
-    CANVAS_SIZE_Y
+    ca_simulator::CASimulator,
+    camera::OrthographicCamera,
+    cursor_to_world,
+    matter::MatterId,
+    timer::{RenderTimer, SimTimer},
+    DynamicSettings, MousePos, CANVAS_SIZE_X, CANVAS_SIZE_Y,
 };
 
 /// Give our text a custom size
@@ -31,9 +29,9 @@ pub fn user_interface(
     windows: Res<Windows>,
     camera: Res<OrthographicCamera>,
     mut settings: ResMut<DynamicSettings>,
-    simulator: Res<CASimulator>,
     sim_timer: Res<SimTimer>,
     render_timer: Res<RenderTimer>,
+    mut simulator: ResMut<CASimulator>,
 ) {
     let (_, gui) = vulkano_windows.get_primary_window_renderer().unwrap();
     let ctx = gui.context();
@@ -47,11 +45,6 @@ pub fn user_interface(
                     sized_text(ui, format!("FPS: {:.2}", avg), size);
                 }
             }
-
-            ui.heading("Settings");
-            ui.add(egui::Slider::new(&mut settings.brush_radius, 0.5..=20.0).text("Brush Size"));
-
-            // Add this too for minor utility
             sized_text(
                 ui,
                 format!("Grid size: ({},{})", CANVAS_SIZE_X, CANVAS_SIZE_Y),
@@ -75,7 +68,9 @@ pub fn user_interface(
                 format!("Render Time: {:.2} ms", render_timer.0.time_average_ms()),
                 size,
             );
-
+            ui.heading("Settings");
+            ui.add(egui::Slider::new(&mut settings.brush_radius, 0.5..=200.0).text("Brush Size"));
+            ui.add(egui::Slider::new(&mut settings.move_steps, 1..=5).text("Move Steps"));
             // Selectable matter
             egui::ComboBox::from_label("Matter")
                 .selected_text(format!("{:?}", settings.draw_matter))
