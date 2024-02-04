@@ -2,7 +2,7 @@
 
 #include "includes.glsl"
 
-// 0-1 linear  from  0-255 sRGB
+// 0-1 linear from  0-255 sRGB
 vec3 linear_from_srgb(vec3 srgb) {
     bvec3 cutoff = lessThan(srgb, vec3(10.31475));
     vec3 lower = srgb / vec3(3294.6);

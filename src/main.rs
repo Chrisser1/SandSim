@@ -22,7 +22,7 @@ use crate::{
     ca_simulator::CASimulator,
     camera::OrthographicCamera,
     gui::user_interface,
-    matter::MatterId,
+    matter::MatterType,
     render::FillScreenRenderPass,
     timer::{PerformanceTimer, RenderTimer, SimTimer},
     utils::{cursor_to_world, MousePos},
@@ -46,7 +46,7 @@ pub const CAMERA_MOVE_SPEED: f32 = 200.0;
 pub struct DynamicSettings {
     pub brush_radius: f32,
     pub move_steps: u32,
-    pub draw_matter: MatterId,
+    pub draw_matter: MatterType,
     pub is_paused: bool,
 }
 
@@ -55,7 +55,7 @@ impl Default for DynamicSettings {
         Self {
             brush_radius: 4.0,
             move_steps: 1,
-            draw_matter: MatterId::Sand,
+            draw_matter: MatterType::Sand,
             is_paused: false,
         }
     }
@@ -123,7 +123,7 @@ fn setup(mut commands: Commands, vulkano_windows: NonSend<BevyVulkanoWindows>) {
     if GREY_SCALE {
         let start = Vec2::new(CANVAS_SIZE_X as f32, CANVAS_SIZE_Y as f32) / 2.0;
         let end = start;
-        sim_pipeline.draw_matter(start, end, CANVAS_SIZE_X as f32, MatterId::Empty);
+        sim_pipeline.draw_matter(start, end, CANVAS_SIZE_X as f32, MatterType::Empty);
     }
     // Create simple orthographic camera
     let mut camera = OrthographicCamera::default();

@@ -116,27 +116,27 @@ bool slides_on_empty(Matter from_diagonal, Matter to_diagonal, Matter from_down)
     return is_gravity(from_diagonal) && !is_empty(from_down) && is_empty(to_diagonal);
 }
 
-// /// From could move to one direction to empty only
-// bool moves_on_empty_certainly(Matter from, Matter to, Matter opposite, Matter down) {
-//     return push_constants.dispersion_step < from.dispersion &&
-//     ((is_liquid(from) && !is_empty(down)) || is_gas(from)) &&
-//     is_empty(to) && !is_empty(opposite);
-// }
+/// From could move to one direction to empty only
+bool moves_on_empty_certainly(Matter from, Matter to, Matter opposite, Matter down) {
+    return push_constants.dispersion_step < from.dispersion &&
+    ((is_liquid(from) && !is_empty(down)) || is_gas(from)) &&
+    is_empty(to) && !is_empty(opposite);
+}
 
-// /// From could move to one direction to liquid only
-// bool moves_on_swap_certainly(Matter from, Matter to, Matter opposite) {
-//     return push_constants.dispersion_step < from.dispersion &&
-//     (is_liquid(from) || is_gas(from)) && (is_liquid(to) || is_gas(to) || is_energy(to)) &&
-//     !(is_liquid(opposite) && opposite.weight < from.weight) &&
-//     to.weight < from.weight;
-// }
+/// From could move to one direction to liquid only
+bool moves_on_swap_certainly(Matter from, Matter to, Matter opposite) {
+    return push_constants.dispersion_step < from.dispersion &&
+    (is_liquid(from) || is_gas(from)) && (is_liquid(to) || is_gas(to) || is_energy(to)) &&
+    !(is_liquid(opposite) && opposite.weight < from.weight) &&
+    to.weight < from.weight;
+}
 
-// /// From could move to both direction to empty, but takes a change at one direction
-// bool moves_on_empty_maybe(Matter from, Matter to, Matter opposite, Matter down, float p) {
-//     return p < 0.5 && push_constants.dispersion_step < from.dispersion &&
-//     ((is_liquid(from) && !is_empty(down)) || is_gas(from)) &&
-//     is_empty(to) && is_empty(opposite);
-// }
+/// From could move to both direction to empty, but takes a change at one direction
+bool moves_on_empty_maybe(Matter from, Matter to, Matter opposite, Matter down, float p) {
+    return p < 0.5 && push_constants.dispersion_step < from.dispersion &&
+    ((is_liquid(from) && !is_empty(down)) || is_gas(from)) &&
+    is_empty(to) && is_empty(opposite);
+}
 
 vec4 matter_color_to_vec4(uint color) {
     return  vec4(float((color >> uint(16)) & uint(255)) / 255.0,

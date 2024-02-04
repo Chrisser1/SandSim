@@ -18,7 +18,7 @@ use vulkano::{
 use vulkano_util::renderer::DeviceImageView;
 
 use crate::{
-    matter::{MatterId, MatterWithColor},
+    matter::{MatterType, MatterWithColor},
     utils::{create_compute_pipeline, storage_buffer_desc, storage_image_desc},
     CANVAS_SIZE_X, CANVAS_SIZE_Y, LOCAL_SIZE_X, LOCAL_SIZE_Y, NUM_WORK_GROUPS_X, NUM_WORK_GROUPS_Y,
 };
@@ -79,7 +79,7 @@ impl CASimulator {
         let spec_const = fall_empty_cs::SpecializationConstants {
             canvas_size_x: CANVAS_SIZE_X as i32,
             canvas_size_y: CANVAS_SIZE_Y as i32,
-            empty_matter: MatterWithColor::new(MatterId::Empty).value,
+            empty_matter: MatterWithColor::new(MatterType::Empty).value,
             constant_3: LOCAL_SIZE_X,
             constant_4: LOCAL_SIZE_Y,
         };
@@ -205,7 +205,7 @@ impl CASimulator {
     }
 
     /// Query matter at pos
-    pub fn query_matter(&mut self, pos: IVec2) -> Option<MatterId> {
+    pub fn query_matter(&mut self, pos: IVec2) -> Option<MatterType> {
         if self.is_inside(pos) {
             self.query_pos = pos;
             // Build command buffer
@@ -230,7 +230,7 @@ impl CASimulator {
     }
 
     /// Draw matter line with given radius
-    pub fn draw_matter(&mut self, start: Vec2, end: Vec2, radius: f32, matter: MatterId) {
+    pub fn draw_matter(&mut self, start: Vec2, end: Vec2, radius: f32, matter: MatterType) {
         // Update our variables to be used as push constants
         self.draw_pos_start = start;
         self.draw_pos_end = end;
@@ -368,7 +368,7 @@ mod tests {
     use bevy::math::IVec2;
     use vulkano_util::context::VulkanoContext;
 
-    use crate::{ca_simulator::CASimulator, matter::MatterId};
+    use crate::{ca_simulator::CASimulator, matter::MatterType};
 
     fn test_setup() -> (VulkanoContext, CASimulator) {
         // Create vulkano context
@@ -383,18 +383,18 @@ mod tests {
         let (_ctx, mut simulator) = test_setup();
         let pos = IVec2::new(10, 10);
         // Empty matter first
-        assert_eq!(simulator.query_matter(pos), Some(MatterId::Empty));
-        simulator.draw_matter(pos.as_vec2(), pos.as_vec2(), 0.5, MatterId::Sand);
+        assert_eq!(simulator.query_matter(pos), Some(MatterType::Empty));
+        simulator.draw_matter(pos.as_vec2(), pos.as_vec2(), 0.5, MatterType::Sand);
         // After drawing, We have Sand
-        assert_eq!(simulator.query_matter(pos), Some(MatterId::Sand));
+        assert_eq!(simulator.query_matter(pos), Some(MatterType::Sand));
         // Step once
         simulator.step(1, false);
         // Old position is empty
-        assert_eq!(simulator.query_matter(pos), Some(MatterId::Empty));
+        assert_eq!(simulator.query_matter(pos), Some(MatterType::Empty));
         // New position under has Sand
         assert_eq!(
             simulator.query_matter(pos + IVec2::new(0, -1)),
-            Some(MatterId::Sand)
+            Some(MatterType::Sand)
         );
     }
 }

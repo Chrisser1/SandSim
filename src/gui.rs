@@ -12,7 +12,7 @@ use crate::{
     ca_simulator::CASimulator,
     camera::OrthographicCamera,
     cursor_to_world,
-    matter::MatterId,
+    matter::MatterType,
     timer::{RenderTimer, SimTimer},
     DynamicSettings, MousePos, CANVAS_SIZE_X, CANVAS_SIZE_Y,
 };
@@ -75,7 +75,7 @@ pub fn user_interface(
             egui::ComboBox::from_label("Matter")
                 .selected_text(format!("{:?}", settings.draw_matter))
                 .show_ui(ui, |ui| {
-                    for matter in MatterId::iter() {
+                    for matter in MatterType::iter() {
                         ui.selectable_value(
                             &mut settings.draw_matter,
                             matter,
