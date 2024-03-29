@@ -4,6 +4,7 @@ Specialization constants
 layout(constant_id = 0) const int canvas_size_x = 1;
 layout(constant_id = 1) const int canvas_size_y = 1;
 layout(constant_id = 2) const uint empty_matter = 1;
+
 layout(local_size_x_id = 3, local_size_y_id = 4, local_size_z = 1) in;
 
 /*
@@ -112,8 +113,8 @@ bool falls_on_empty(Matter from, Matter to) {
     return is_gravity(from) && is_empty(to);
 }
 
-bool slides_on_empty(Matter from_diagonal, Matter to_diagonal, Matter from_down) {
-    return is_gravity(from_diagonal) && !is_empty(from_down) && is_empty(to_diagonal);
+bool slides_on_empty(Matter from_diagonal, Matter to_diagonal, Matter from_down, Matter side) {
+    return is_gravity(from_diagonal) && !is_empty(from_down) && is_empty(to_diagonal) && is_empty(side);
 }
 
 // /// From could move to one direction to empty only

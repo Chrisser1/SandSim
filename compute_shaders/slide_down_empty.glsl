@@ -6,14 +6,16 @@
 void slide_left_empty(ivec2 pos) {
     Matter current = read_matter(pos);
     Matter down = get_neighbor(pos, DOWN);
+    Matter up = get_neighbor(pos, UP);
     Matter right = get_neighbor(pos, RIGHT);
+    Matter left = get_neighbor(pos, LEFT);
     Matter up_right = get_neighbor(pos, UP_RIGHT);
     Matter down_left = get_neighbor(pos, DOWN_LEFT);
 
     Matter m = current;
-    if (!is_at_border_top(pos) && !is_at_border_right(pos) && slides_on_empty(up_right, current, right)) {
+    if (!is_at_border_top(pos) && !is_at_border_right(pos) && slides_on_empty(up_right, current, right, up)) {
         m = up_right;
-    } else if (!is_at_border_bottom(pos) && !is_at_border_left(pos) && slides_on_empty(current, down_left, down)) {
+    } else if (!is_at_border_bottom(pos) && !is_at_border_left(pos) && slides_on_empty(current, down_left, down, left)) {
         m = down_left;
     }
     write_matter(pos, m);
@@ -23,14 +25,16 @@ void slide_left_empty(ivec2 pos) {
 void slide_right_empty(ivec2 pos) {
     Matter current = read_matter(pos);
     Matter down = get_neighbor(pos, DOWN);
+    Matter up = get_neighbor(pos, UP);
     Matter left = get_neighbor(pos, LEFT);
+    Matter right = get_neighbor(pos, RIGHT);
     Matter up_left = get_neighbor(pos, UP_LEFT);
     Matter down_right = get_neighbor(pos, DOWN_RIGHT);
 
     Matter m = current;
-    if (!is_at_border_top(pos) && !is_at_border_left(pos) && slides_on_empty(up_left, current, left)) {
+    if (!is_at_border_top(pos) && !is_at_border_left(pos) && slides_on_empty(up_left, current, left, up)) {
         m = up_left;
-    } else if (!is_at_border_bottom(pos) && !is_at_border_right(pos) && slides_on_empty(current, down_right, down)) {
+    } else if (!is_at_border_bottom(pos) && !is_at_border_right(pos) && slides_on_empty(current, down_right, down, right)) {
         m = down_right;
     }
     write_matter(pos, m);
