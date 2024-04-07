@@ -13,6 +13,7 @@ vulkano-shaders = "0.30.0"
 vulkano-util = "0.30.0"
 strum_macros = "0.24.0"
 strum = "0.24.0"
+bitflags = "2.5"
 
 # Bevy Game framework without default features, because we're replacing the gfx backend with Vulkano
 [dependencies.bevy]
