@@ -70,6 +70,9 @@ pub struct MatterDefinition {
     pub name: String,
     pub color: u32,
     pub weight: f32,
+    /// MatterState defines what state the matter is in
+    /// - Liquid: behaves like a liquid
+    /// - Powder: behaves like a powder
     pub state: MatterState,
     /// Characteristics defines what the matter "does to others"
     /// - Water: "Cools", "Rusts"
@@ -97,34 +100,6 @@ impl MatterDefinition {
                 MatterReaction::zero(),
                 MatterReaction::zero(),
             ],
-        }
-    }
-}
-
-pub struct MatterDefinitions {
-    pub definitions: Vec<MatterDefinition>,
-    pub empty: u32,
-}
-
-pub fn validate_matter_definitions(matter_definitions: &MatterDefinitions) {
-    for (i, m) in matter_definitions.definitions.iter().enumerate() {
-        if m.id != i as u32 {
-            panic!(
-                "Invalid matter definition, definition {}: id {} does not equal matter id index {}",
-                m.name,
-                { m.id },
-                i as u32
-            );
-        }
-        if m.reactions
-            .iter()
-            .any(|r| r.becomes >= matter_definitions.definitions.len() as u32)
-        {
-            panic!(
-                "Matter reaction invalid for id: {}, name: {}. 'becomes' must not be larger than \
-                 any id",
-                m.id, m.name
-            )
         }
     }
 }
