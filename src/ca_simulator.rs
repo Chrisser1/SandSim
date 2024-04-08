@@ -18,7 +18,7 @@ use vulkano::{
 use vulkano_util::renderer::DeviceImageView;
 
 use crate::{
-    matter::{MatterId, MatterWithColor},
+    matter::{MatterDefinition, MATTER_EMPTY, MatterId},
     utils::{create_compute_pipeline, storage_buffer_desc, storage_image_desc},
     CANVAS_SIZE_X, CANVAS_SIZE_Y, LOCAL_SIZE_X, LOCAL_SIZE_Y, NUM_WORK_GROUPS_X, NUM_WORK_GROUPS_Y,
 };
@@ -45,14 +45,16 @@ pub struct CASimulator {
     color_pipeline: Arc<ComputePipeline>,
     draw_matter_pipeline: Arc<ComputePipeline>,
     query_matter_pipeline: Arc<ComputePipeline>,
+    // Shader matter inputs
     matter_in: Arc<DeviceLocalBuffer<[u32]>>,
     matter_out: Arc<DeviceLocalBuffer<[u32]>>,
     query_matter: Arc<CpuAccessibleBuffer<[u32]>>,
     image: DeviceImageView,
+    //... push constants
     pub sim_step: u32,
     move_step: u32,
     draw_radius: f32,
-    draw_matter: MatterWithColor,
+    draw_matter: MatterDefinition,
     draw_pos_start: Vec2,
     draw_pos_end: Vec2,
     query_pos: IVec2,
@@ -71,7 +73,7 @@ impl CASimulator {
             compute_queue.device().clone(),
             BufferUsage::storage_buffer() | BufferUsage::transfer_dst(),
             false,
-            vec![MatterWithColor::from(0).value],
+            vec![MATTER_EMPTY.to_matter_with_color()],
         )
         .unwrap();
 
@@ -79,7 +81,7 @@ impl CASimulator {
         let spec_const = fall_empty_cs::SpecializationConstants {
             canvas_size_x: CANVAS_SIZE_X as i32,
             canvas_size_y: CANVAS_SIZE_Y as i32,
-            empty_matter: MatterWithColor::new(MatterId::Empty).value,
+            empty_matter: MATTER_EMPTY.to_matter_with_color(),
             constant_3: LOCAL_SIZE_X,
             constant_4: LOCAL_SIZE_Y,
         };
@@ -165,7 +167,7 @@ impl CASimulator {
             sim_step: 0,
             move_step: 0,
             draw_radius: 0.0,
-            draw_matter: MatterWithColor::from(0),
+            draw_matter: MatterDefinition::zero(),
             draw_pos_start: Vec2::new(0.0, 0.0),
             draw_pos_end: Vec2::new(0.0, 0.0),
             query_pos: IVec2::new(0, 0),
@@ -223,7 +225,7 @@ impl CASimulator {
 
             // Read result
             let query_matter = self.query_matter.read().unwrap();
-            Some(MatterWithColor::from(query_matter[0]).matter_id())
+            Some(MatterDefinition::get_id_from_u32(query_matter[0]))
         } else {
             None
         }
@@ -234,7 +236,7 @@ impl CASimulator {
         // Update our variables to be used as push constants
         self.draw_pos_start = start;
         self.draw_pos_end = end;
-        self.draw_matter = MatterWithColor::new(matter);
+        self.draw_matter = MatterDefinition::new(matter);
         self.draw_radius = radius;
 
         // Build command buffer
@@ -308,7 +310,7 @@ impl CASimulator {
             draw_pos_start: self.draw_pos_start.into(),
             draw_pos_end: self.draw_pos_end.into(),
             draw_radius: self.draw_radius,
-            draw_matter: self.draw_matter.value,
+            draw_matter: self.draw_matter.to_matter_with_color(),
             query_pos: self.query_pos.into(),
         };
         builder

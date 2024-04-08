@@ -1,7 +1,50 @@
+use std::fmt;
+
 use bitflags::bitflags;
+use serde::{de, de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
+use strum_macros::EnumIter;
+use vulkano::instance::debug;
+
+struct U32Visitor;
+
+impl<'de> Visitor<'de> for U32Visitor {
+    type Value = u32;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("an integer between 0 and 2^32")
+    }
+
+    fn visit_u8<E>(self, value: u8) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(u32::from(value))
+    }
+
+    fn visit_u32<E>(self, value: u32) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(value)
+    }
+
+    fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        if value >= u64::from(u32::MIN) && value <= u64::from(u32::MAX) {
+            Ok(value as u32)
+        } else {
+            Err(E::custom(format!("u32 out of range: {}", value)))
+        }
+    }
+}
 
 /// Matter state defines how matter moves
 #[repr(u32)]
+#[derive(
+    EnumIter, Serialize, Deserialize, Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Hash,
+)]
 pub enum MatterState {
     Empty = 0,
     Powder = 1,
@@ -15,6 +58,7 @@ pub enum MatterState {
 
 bitflags! {
     /// Reaction cause defines whether a matter causes a reaction
+    #[derive(Clone, Copy, Debug)]
     pub struct Direction: u32 {
         const UP_LEFT = 1 << 0;
         const UP = 1 << 1;
@@ -26,6 +70,25 @@ bitflags! {
         const LEFT = 1 << 7;
         const ALL = 0b11111111;
         const NONE = 0;
+    }
+}
+
+impl Serialize for Direction {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_u32(self.bits())
+    }
+}
+
+impl<'de> Deserialize<'de> for Direction {
+    fn deserialize<D>(deserializer: D) -> Result<Direction, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let res = deserializer.deserialize_u32(U32Visitor)?;
+        Ok(Direction::from_bits(res).unwrap())
     }
 }
 
@@ -42,6 +105,7 @@ pub const ALL_DIRECTIONS: [(Direction, &str); 8] = [
 
 bitflags! {
     /// Reaction cause defines whether a matter causes a reaction
+    #[derive(Clone, Copy, Debug)]
     pub struct MatterCharacteristic: u32 {
         /// A material that is corrosive
         const CORROSIVE = 1 << 0;
@@ -87,6 +151,25 @@ bitflags! {
         const VAPORIZES = 1 << 16;
         /// Eraser
         const ERASER = 1 << 17;
+    }
+}
+
+impl Serialize for MatterCharacteristic {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_u32(self.bits())
+    }
+}
+
+impl<'de> Deserialize<'de> for MatterCharacteristic {
+    fn deserialize<D>(deserializer: D) -> Result<MatterCharacteristic, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let res = deserializer.deserialize_u32(U32Visitor)?;
+        Ok(MatterCharacteristic::from_bits(res).unwrap())
     }
 }
 

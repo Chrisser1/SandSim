@@ -10,6 +10,7 @@ dependencies = [
  "bevy_vulkano",
  "bitflags 2.5.0",
  "bytemuck",
+ "serde",
  "strum",
  "strum_macros",
  "vulkano",
