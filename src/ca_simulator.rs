@@ -18,7 +18,7 @@ use vulkano::{
 use vulkano_util::renderer::DeviceImageView;
 
 use crate::{
-    matter::{MatterDefinition, MATTER_EMPTY, MatterId},
+    matter::{MatterDefinition, MATTER_EMPTY, MatterId, MatterState},
     utils::{create_compute_pipeline, storage_buffer_desc, storage_image_desc},
     CANVAS_SIZE_X, CANVAS_SIZE_Y, LOCAL_SIZE_X, LOCAL_SIZE_Y, NUM_WORK_GROUPS_X, NUM_WORK_GROUPS_Y,
 };
@@ -82,8 +82,16 @@ impl CASimulator {
             canvas_size_x: CANVAS_SIZE_X as i32,
             canvas_size_y: CANVAS_SIZE_Y as i32,
             empty_matter: MATTER_EMPTY.to_matter_with_color(),
-            constant_3: LOCAL_SIZE_X,
-            constant_4: LOCAL_SIZE_Y,
+            state_empty: MatterState::Empty as u32,
+            state_powder: MatterState::Powder as u32,
+            state_liquid: MatterState::Liquid as u32,
+            state_solid: MatterState::Solid as u32,
+            state_solid_gravity: MatterState::SolidGravity as u32,
+            state_gas: MatterState::Gas as u32,
+            state_energy: MatterState::Energy as u32,
+            state_object: MatterState::Object as u32,
+            constant_11: LOCAL_SIZE_X,
+            constant_12: LOCAL_SIZE_Y,
         };
 
         // Create pipelines

@@ -4,8 +4,16 @@ Specialization constants
 layout(constant_id = 0) const int canvas_size_x = 1;
 layout(constant_id = 1) const int canvas_size_y = 1;
 layout(constant_id = 2) const uint empty_matter = 1;
+layout(constant_id = 3) const uint state_empty = 1;
+layout(constant_id = 4) const uint state_powder = 1;
+layout(constant_id = 5) const uint state_liquid = 1;
+layout(constant_id = 6) const uint state_solid = 1;
+layout(constant_id = 7) const uint state_solid_gravity = 1;
+layout(constant_id = 8) const uint state_gas = 1;
+layout(constant_id = 9) const uint state_energy = 1;
+layout(constant_id = 10) const uint state_object = 1;
 
-layout(local_size_x_id = 3, local_size_y_id = 4, local_size_z = 1) in;
+layout(local_size_x_id = 11, local_size_y_id = 12, local_size_z = 1) in;
 
 /*
 Buffers
