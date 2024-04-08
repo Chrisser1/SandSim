@@ -161,32 +161,3 @@ impl MatterDefinition {
         MatterId::from((color_and_id & 255) as u8)
     }
 }
-
-
-// /// Matter data where first 3 bytes are saved for color and last 4th byte is saved for matter id
-// #[derive(Default, Copy, Clone)]
-// pub struct MatterWithColor {
-//     pub value: u32,
-// }
-
-// impl MatterWithColor {
-//     /// Creates a new matter with color from matter id giving it a slightly randomized color
-//     pub fn new(matter_id: MatterId) -> MatterWithColor {
-//         let color = matter_id.color_rgba_u8();
-//         MatterWithColor {
-//             value: u8_rgba_to_u32_rgba(color[0], color[1], color[2], matter_id as u8),
-//         }
-//     }
-
-//     pub fn matter_id(&self) -> MatterId {
-//         ((self.value & 255) as u8).into()
-//     }
-// }
-
-// impl From<u32> for MatterWithColor {
-//     fn from(item: u32) -> Self {
-//         Self {
-//             value: item,
-//         }
-//     }
-// }
