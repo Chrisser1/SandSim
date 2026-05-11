@@ -1,23 +1,24 @@
 [package]
 name = "SandSim"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy_vulkano = { version = "0.6.0", features = ["gui"] }
-bytemuck = "1.9.1"
-vulkano = "0.30.0"
-vulkano-shaders = "0.30.0"
-vulkano-util = "0.30.0"
-strum_macros = "0.24.0"
-strum = "0.24.0"
-bitflags = "2.5"
-serde = "1.0"
+# Bevy Core
+bevy = { version = "0.18", features = ["multi_threaded", "bevy_winit", "bevy_render", "bevy_asset", "bevy_core_pipeline"] }
 
-# Bevy Game framework without default features, because we're replacing the gfx backend with Vulkano
-[dependencies.bevy]
-version = "0.8.0"
-default-features = false
-features = []
+# UI
+bevy_egui = "0.39"
+
+# GPU Data Handling
+bytemuck = { version = "1.19", features = ["derive"] }
+encase = { version = "0.10", features = ["glam"] } # Handles GPU padding/alignment
+
+# Utilities
+strum = { version = "0.26", features = ["derive"] }
+strum_macros = "0.26"
+bitflags = "2.11"
+serde = { version = "1.0", features = ["derive"] }
+anyhow = "1.0"
