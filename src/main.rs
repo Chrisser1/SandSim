@@ -1,15 +1,15 @@
-mod camera;
 mod matter;
-mod simulation;
-mod pipeline;
+mod ui;
+mod render;
+mod input;
 
 use bevy::{
     prelude::*,
-    diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin}, 
+    diagnostic::FrameTimeDiagnosticsPlugin, 
 };
-use crate::camera::CameraPlugin;
-use crate::simulation::SimulationPlugin;
-use crate::pipeline::SandComputePlugin;
+use crate::render::{SimulationPlugin, SandComputePlugin};
+use crate::ui::{CameraPlugin, GuiPlugin};
+use crate::input::MousePlugin;
 
 fn main() {
     App::new()
@@ -21,27 +21,13 @@ fn main() {
             }),
             ..default()
         }))
-        .add_plugins(FrameTimeDiagnosticsPlugin::default()) 
-        .add_plugins(CameraPlugin)
-        .add_plugins(SimulationPlugin)
-        .add_plugins(SandComputePlugin)
-        .add_systems(Update, update_window_title) 
+        .add_plugins((
+            FrameTimeDiagnosticsPlugin::default(), 
+            CameraPlugin, 
+            SimulationPlugin, 
+            SandComputePlugin, 
+            GuiPlugin, 
+            MousePlugin,
+        ))
         .run();
-}
-
-// The system that updates the window title with the current FPS
-fn update_window_title(
-    diagnostics: Res<DiagnosticsStore>,
-    mut windows: Query<&mut Window>,
-) {
-    // Look up the FPS diagnostic
-    if let Some(fps) = diagnostics.get(&FrameTimeDiagnosticsPlugin::FPS) {
-        // Get the smoothed average FPS
-        if let Some(value) = fps.smoothed() {
-            // Update the window title
-            if let Ok(mut window) = windows.single_mut() {
-                window.title = format!("SandSim | {:.1} FPS", value);
-            }
-        }
-    }
 }

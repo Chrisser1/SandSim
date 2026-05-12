@@ -3,7 +3,7 @@ use bevy::{
         Render, RenderApp, render_asset::RenderAssets, render_graph::{NodeRunError, RenderGraph, RenderGraphContext, RenderLabel}, render_resource::*, renderer::{RenderContext, RenderDevice}, storage::GpuShaderStorageBuffer, texture::GpuImage
     }
 };
-use crate::simulation::{SandGridGPU, GRID_WIDTH, GRID_HEIGHT};
+use crate::render::{SandGridGPU, GRID_WIDTH, GRID_HEIGHT};
 
 /// Label for our node in the Render Graph
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
@@ -46,9 +46,9 @@ impl FromWorld for SandPipeline {
         let entries = BindGroupLayoutEntries::sequential(
             ShaderStages::COMPUTE,
             (
-                binding_types::storage_buffer_read_only::<crate::simulation::GridConfig>(false),
-                binding_types::storage_buffer_read_only::<crate::matter::Pixel>(false),
-                binding_types::storage_buffer::<crate::matter::Pixel>(false),
+                binding_types::storage_buffer_read_only::<crate::render::GridConfig>(false),
+                binding_types::storage_buffer_read_only::<crate::matter::Matter>(false),
+                binding_types::storage_buffer::<crate::matter::Matter>(false),
                 binding_types::texture_storage_2d(TextureFormat::Rgba8Unorm, StorageTextureAccess::WriteOnly),
             ),
         );
@@ -90,7 +90,7 @@ fn prepare_bind_group(
     mut commands: Commands,
     pipeline: Res<SandPipeline>,
     render_device: Res<RenderDevice>,
-    gpu_data: Option<Res<SandGridGPU>>, 
+    gpu_data: Option<Res<SandGridGPU>>,
     buffers: Res<RenderAssets<GpuShaderStorageBuffer>>, 
     images: Res<RenderAssets<GpuImage>>,
 ) {
@@ -138,7 +138,7 @@ impl bevy::render::render_graph::Node for SandNode {
             pass.set_pipeline(pipeline);
             pass.set_bind_group(0, &bind_group.0, &[]);
             
-            pass.dispatch_workgroups(GRID_WIDTH / 8, GRID_HEIGHT / 8, 1);
+            pass.dispatch_workgroups(GRID_WIDTH / 16, GRID_HEIGHT / 16, 1);
         }
         Ok(())
     }

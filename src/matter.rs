@@ -5,11 +5,9 @@ use bevy::render::render_resource::ShaderType;
 /// The fundamental unit of our simulation. 
 /// We keep it at exactly 8 bytes (two u32s) for optimal GPU alignment.
 #[repr(C)]
-#[derive(Copy, Clone, Debug, Pod, Zeroable, Serialize, Deserialize, ShaderType)]
-pub struct Pixel {
-    /// Stores the MatterId and potentially 8-bit metadata (like life-time or temperature)
-    pub matter_info: u32,
-    /// The current color of the pixel, stored as 0xRRGGBBAA
+#[derive(Copy, Clone, Debug, Pod, Zeroable, ShaderType)]
+pub struct Matter {
+    pub info: u32,
     pub color: u32,
 }
 
@@ -35,10 +33,10 @@ pub enum MatterState {
     Gas = 4,
 }
 
-impl Pixel {
+impl Matter {
     pub fn new(id: MatterId, color: u32) -> Self {
         Self {
-            matter_info: id as u32,
+            info: id as u32,
             color,
         }
     }
