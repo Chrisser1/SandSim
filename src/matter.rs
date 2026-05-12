@@ -1,12 +1,11 @@
-use bevy::prelude::*;
 use bytemuck::{Pod, Zeroable};
 use serde::{Deserialize, Serialize};
-use strum_macros::EnumIter;
+use bevy::render::render_resource::ShaderType;
 
 /// The fundamental unit of our simulation. 
 /// We keep it at exactly 8 bytes (two u32s) for optimal GPU alignment.
 #[repr(C)]
-#[derive(Copy, Clone, Debug, Pod, Zeroable, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable, Serialize, Deserialize, ShaderType)]
 pub struct Pixel {
     /// Stores the MatterId and potentially 8-bit metadata (like life-time or temperature)
     pub matter_info: u32,
@@ -16,7 +15,7 @@ pub struct Pixel {
 
 /// Matter Id representing matter types
 #[repr(u32)]
-#[derive(Serialize, Deserialize, EnumIter, Debug, Copy, Clone, Eq, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub enum MatterId {
     #[default]
     Empty = 0,

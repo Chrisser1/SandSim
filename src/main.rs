@@ -1,41 +1,47 @@
-mod matter;
 mod camera;
+mod matter;
+mod simulation;
+mod pipeline;
 
-use bevy::{prelude::*, window::WindowResolution};
-use bevy_egui::EguiPlugin;
-
-use camera::CameraPlugin;
+use bevy::{
+    prelude::*,
+    diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin}, 
+};
+use crate::camera::CameraPlugin;
+use crate::simulation::SimulationPlugin;
+use crate::pipeline::SandComputePlugin;
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "SandSim - Native Bevy".into(),
-                resolution: WindowResolution::new(1280, 720),
+                present_mode: bevy::window::PresentMode::AutoNoVsync, 
                 ..default()
             }),
             ..default()
         }))
-        
-        // Add Egui for our UI
-        .add_plugins(EguiPlugin::default())
+        .add_plugins(FrameTimeDiagnosticsPlugin::default()) 
         .add_plugins(CameraPlugin)
-        
-        // Our Initial Logic
-        .add_systems(Startup, setup)
-        .add_systems(Update, close_on_esc)
-        
+        .add_plugins(SimulationPlugin)
+        .add_plugins(SandComputePlugin)
+        .add_systems(Update, update_window_title) 
         .run();
 }
 
-fn setup(mut commands: Commands) {
-    commands.spawn(Camera2d);
-    
-    info!("SandSim Window Initialized!");
-}
-
-fn close_on_esc(keys: Res<ButtonInput<KeyCode>>, mut exit: MessageWriter<AppExit>) {
-    if keys.just_pressed(KeyCode::Escape) {
-        exit.write(AppExit::Success);
+// The system that updates the window title with the current FPS
+fn update_window_title(
+    diagnostics: Res<DiagnosticsStore>,
+    mut windows: Query<&mut Window>,
+) {
+    // Look up the FPS diagnostic
+    if let Some(fps) = diagnostics.get(&FrameTimeDiagnosticsPlugin::FPS) {
+        // Get the smoothed average FPS
+        if let Some(value) = fps.smoothed() {
+            // Update the window title
+            if let Ok(mut window) = windows.single_mut() {
+                window.title = format!("SandSim | {:.1} FPS", value);
+            }
+        }
     }
 }
