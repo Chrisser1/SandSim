@@ -31,6 +31,7 @@
         clippy 
         rust-analyzer
         cmake
+        python3
       ];
 
       # buildInputs is for libraries your code links against
@@ -38,6 +39,7 @@
 
       env = {
         RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
+        SHADERC_LIB_DIR = "${pkgs.shaderc.lib}/lib";
       };
 
       shellHook = ''
