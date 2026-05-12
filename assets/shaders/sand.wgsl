@@ -34,50 +34,69 @@ fn get_matter(x: i32, y: i32) -> Matter {
     return grid_in[u32(y) * config.width + u32(x)];
 }
 
-// Returns true if 'src' can push 'dst' out of the way
+// Updated to handle relative weights more like the old "weight" system
 fn can_displace(src: u32, dst: u32) -> bool {
-    if (src == 1u && (dst == 0u || dst == 3u)) { return true; } // Sand sinks in Water and Empty
-    if (src == 3u && dst == 0u) { return true; }                // Water sinks in Empty
+    if (src == 1u) { // Sand
+        return dst == 0u || dst == 3u; // Sinks in Empty and Water
+    }
+    if (src == 3u) { // Water
+        return dst == 0u; // Sinks only in Empty
+    }
     return false;
 }
 
-// STEP 1: Where does this cell WANT to go? (Evaluated safely by all threads)
 fn get_target(x: i32, y: i32) -> vec2<i32> {
     let me = get_matter(x, y);
     let pos = vec2<i32>(x, y);
     
-    if (me.info == 2u || me.info == 0u) { return pos; } // Rock/Empty don't move
+    if (me.info == 2u || me.info == 0u) { return pos; } 
 
-    // Use time to alternate diagonal preferences so piles form evenly
     let bias_left = (config.time + u32(x) + u32(y)) % 2u == 0u;
 
-    if (me.info == 1u || me.info == 3u) {
-        let d = get_matter(x, y + 1);
-        if (can_displace(me.info, d.info)) { return vec2<i32>(x, y + 1); }
+    // 1. Primary Gravity (Down)
+    let d = get_matter(x, y + 1);
+    if (can_displace(me.info, d.info)) { return vec2<i32>(x, y + 1); }
 
-        let dl = get_matter(x - 1, y + 1);
-        let dr = get_matter(x + 1, y + 1);
-        if (bias_left) {
-            if (can_displace(me.info, dl.info)) { return vec2<i32>(x - 1, y + 1); }
-            if (can_displace(me.info, dr.info)) { return vec2<i32>(x + 1, y + 1); }
-        } else {
-            if (can_displace(me.info, dr.info)) { return vec2<i32>(x + 1, y + 1); }
-            if (can_displace(me.info, dl.info)) { return vec2<i32>(x - 1, y + 1); }
+    // 2. Diagonal Falling (Sliding)
+    let dl = get_matter(x - 1, y + 1);
+    let dr = get_matter(x + 1, y + 1);
+    if (bias_left) {
+        if (can_displace(me.info, dl.info)) { return vec2<i32>(x - 1, y + 1); }
+        if (can_displace(me.info, dr.info)) { return vec2<i32>(x + 1, y + 1); }
+    } else {
+        if (can_displace(me.info, dr.info)) { return vec2<i32>(x + 1, y + 1); }
+        if (can_displace(me.info, dl.info)) { return vec2<i32>(x - 1, y + 1); }
+    }
+    
+    // 3. Liquid Spreading (Only for Water)
+    if (me.info == 3u) {
+        // IMPORTANT: Only spread if resting on something (not empty below)
+        // This prevents water from "expanding" while falling.
+        if (d.info != 0u) {
+            // DISPERSION: Check multiple pixels to the side for faster flow
+            let dispersion = 5; 
+            var left_dist = 0;
+            var right_dist = 0;
+
+            // Look Left
+            for (var i = 1; i <= dispersion; i++) {
+                if (get_matter(x - i, y).info == 0u) { 
+                    left_dist = i; 
+                } else { break; }
+            }
+            // Look Right
+            for (var i = 1; i <= dispersion; i++) {
+                if (get_matter(x + i, y).info == 0u) { 
+                    right_dist = i; 
+                } else { break; }
+            }
+
+            if (bias_left && left_dist > 0) { return vec2<i32>(x - 1, y); }
+            if (right_dist > 0) { return vec2<i32>(x + 1, y); }
+            if (left_dist > 0) { return vec2<i32>(x - 1, y); }
         }
     }
     
-    // Water Spreading
-    if (me.info == 3u) {
-        let l = get_matter(x - 1, y);
-        let r = get_matter(x + 1, y);
-        if (bias_left) {
-            if (can_displace(me.info, l.info)) { return vec2<i32>(x - 1, y); }
-            if (can_displace(me.info, r.info)) { return vec2<i32>(x + 1, y); }
-        } else {
-            if (can_displace(me.info, r.info)) { return vec2<i32>(x + 1, y); }
-            if (can_displace(me.info, l.info)) { return vec2<i32>(x - 1, y); }
-        }
-    }
     return pos;
 }
 
